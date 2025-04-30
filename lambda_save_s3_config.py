@@ -8,8 +8,12 @@ TABLE_NAME = 's3file-config-table'
 def lambda_handler(event, context):
     print(event)
 
-    bucket_name = event['Records'][0]['s3']['bucket']['name']
-    file_name = event['Records'][0]['s3']['object']['key']
+    sns = event['Records'][0]['Sns']
+    sns_message = json.loads(sns['Message'])
+
+    print(sns_message)
+    bucket_name = sns_message['Records'][0]['s3']['bucket']['name']
+    file_name = sns_message['Records'][0]['s3']['object']['key']
 
     response = s3_client.head_object(Bucket=bucket_name, Key=file_name)
 
