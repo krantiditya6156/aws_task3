@@ -44,6 +44,14 @@ def get_glue_job_name(content_type, file_size):
         else:
             glue_job_name = "gluejob_json_other"
 
+    elif content_type == "text/csv":
+        if file_size <= 5000:
+            glue_job_name = "gluejob_csv_5kb"
+        elif file_size > 5000 and file_size <= 10000:
+            glue_job_name = "gluejob_csv_5_10kb"
+        else:
+            glue_job_name = "gluejob_csv_other"
+
     return glue_job_name
 
 
@@ -85,4 +93,5 @@ def lambda_handler(event, context):
         print(e)
         raise
 
-    return {"statusCode": 200, "body": json.dumps("success")}
+    # TODO implement
+    return {"statusCode": 200, "body": json.dumps("Success")}
