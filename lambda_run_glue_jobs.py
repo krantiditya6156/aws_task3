@@ -29,18 +29,18 @@ def get_glue_job_name(content_type, file_size):
             glue_job_name = "gluejob_image_other"
 
     elif content_type == "text/plain":
-        if file_size <= 100000:
-            glue_job_name = "gluejob_text_100kb"
-        elif file_size > 100000 and file_size <= 200000:
-            glue_job_name = "gluejob_text_100_200kb"
+        if file_size <= 5000:
+            glue_job_name = "gluejob_text_5kb"
+        elif file_size > 5000 and file_size <= 10000:
+            glue_job_name = "gluejob_text_5_10kb"
         else:
             glue_job_name = "gluejob_text_other"
 
     elif content_type == "application/json":
-        if file_size <= 100000:
-            glue_job_name = "gluejob_json_100kb"
-        elif file_size > 100000 and file_size <= 200000:
-            glue_job_name = "gluejob_json_100_200kb"
+        if file_size <= 5000:
+            glue_job_name = "gluejob_json_5kb"
+        elif file_size > 5000 and file_size <= 10000:
+            glue_job_name = "gluejob_json_5_10kb"
         else:
             glue_job_name = "gluejob_json_other"
 
