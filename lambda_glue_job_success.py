@@ -40,7 +40,7 @@ def get_crawler_name(job_name):
             crawler_name = "csvfiles_crawler"
         elif "json" in job_name:
             crawler_name = "jsonfiles_crawler"
-        elif "txt" in job_name:
+        elif "text" in job_name:
             crawler_name = "textfiles_crawler"
         return crawler_name
     except Exception as e:
