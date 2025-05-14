@@ -45,7 +45,7 @@ Resources:
             Resource: !Ref SNSTopic
             Condition:
                 StringEquals:
-                  AWS:SourceOwner: ${AWS::AccountId}
+                  AWS:SourceOwner: !Sub '${AWS::AccountId}'
 
           - Sid: S3Acsess
             Effect: Allow
@@ -56,7 +56,7 @@ Resources:
             Resource: !Ref SNSTopic
             Condition:
               StringEquals:
-                aws:SourceAccount: ${AWS::AccountId}
+                aws:SourceAccount: !Sub '${AWS::AccountId}'
               ArnEquals:
                 aws:SourceArn: !Sub arn:aws:s3:::${SourceBucketName}
       Topics:
