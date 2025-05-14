@@ -95,6 +95,25 @@ Resources:
       ManagedPolicyArns: 
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/AmazonSNSReadOnlyAccess
+      Policies:
+        - PolicyName: DynamoDBGet
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query                 
+                Resource: !GetAtt DynamoDBTable.Arn
+
+        - PolicyName: GlueStartJobRun
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - glue:StartJobRun
+                  - glue:GetJobRun                                    
+                Resource: !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/*
 
   InvokeLambdaRunGlueJob:
     Type: AWS::Lambda::Permission
@@ -119,6 +138,9 @@ Resources:
       Description: Lambda function 
       Role: !GetAtt LambdaExecutionRole2.Arn
       Runtime: python3.12
+      Environment: 
+        Variables:
+          "TABLE_NAME": !Ref DynamoDBTable
       Code:
         S3Bucket: !Sub 'codebucket-${AWS::AccountId}'
         S3Key: lambda_run_glue_jobs.zip

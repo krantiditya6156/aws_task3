@@ -1,9 +1,10 @@
 import json
+import os
 
 import boto3
 from boto3.dynamodb.conditions import Key
 
-TABLE_NAME = "s3file-config-table"
+TABLE_NAME = os.environ["TABLE_NAME"]
 
 dynamodb = boto3.resource("dynamodb")
 
