@@ -1,0 +1,138 @@
+---
+Parameters:
+  SourceBucketName:
+    Description: Enter source bucket name
+    Type: String
+
+Resources:
+  SourceBucket:
+    Type: AWS::S3::Bucket 
+    Properties:
+      BucketName: !Ref SourceBucketName
+      NotificationConfiguration:
+        TopicConfigurations:
+          - Event: "s3:ObjectCreated:*"
+            Topic: !Ref SNSTopic
+
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:    
+      Subscription: 
+        - Endpoint: !GetAtt LambdaRunGlueJob.Arn           
+          Protocol: lambda
+        - Endpoint: !GetAtt LambdaSaveS3Config.Arn            
+          Protocol: lambda
+      TopicName: SNSTopicForFilesBucket
+
+  SNSTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Sid: SNSActions
+            Effect: Allow
+            Principal:
+                AWS: "*"
+            Action:
+              - SNS:Publish
+              - SNS:RemovePermission
+              - SNS:SetTopicAttributes
+              - SNS:DeleteTopic
+              - SNS:ListSubscriptionsByTopic
+              - SNS:GetTopicAttributes
+              - SNS:AddPermission
+              - SNS:Subscribe
+            Resource: !Ref SNSTopic
+            Condition:
+                StringEquals:
+                  AWS:SourceOwner: ${AWS::AccountId}
+
+          - Sid: S3Acsess
+            Effect: Allow
+            Principal: 
+              Service: 
+                - s3.amazonaws.com
+            Action: SNS:Publish
+            Resource: !Ref SNSTopic
+            Condition:
+              StringEquals:
+                aws:SourceAccount: ${AWS::AccountId}
+              ArnEquals:
+                aws:SourceArn: !Sub arn:aws:s3:::${SourceBucketName}
+      Topics:
+        - !Ref SNSTopic
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonSNSReadOnlyAccess
+
+  InvokeLambdaRunGlueJob:
+    Type: AWS::Lambda::Permission
+    Properties: 
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref  LambdaRunGlueJob
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref SNSTopic
+
+  InvokeLambdaSaveS3Config:
+    Type: AWS::Lambda::Permission
+    Properties: 
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref  LambdaSaveS3Config
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref SNSTopic      
+
+  LambdaRunGlueJob:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.lambda_handler
+      Description: Lambda function 
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: python3.12
+      Code:
+        ZipFile: |
+          import json
+
+          def lambda_handler(event, context):
+
+              print(event)
+              # TODO implement
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps('Hello from Lambda!')
+              }
+
+
+  LambdaSaveS3Config:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.lambda_handler
+      Description: Lambda function 
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: python3.12
+      Code:
+        ZipFile: |
+          import json
+
+          def lambda_handler(event, context):
+
+              print(event)
+              # TODO implement
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps('Hello from Lambda!')
+              }
+
+
+
