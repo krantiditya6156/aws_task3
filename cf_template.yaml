@@ -13,6 +13,8 @@ Resources:
         TopicConfigurations:
           - Event: "s3:ObjectCreated:*"
             Topic: !Ref SNSTopic
+      VersioningConfiguration:
+        Status: Enabled
 
   SNSTopic:
     Type: AWS::SNS::Topic
@@ -62,7 +64,24 @@ Resources:
       Topics:
         - !Ref SNSTopic
 
-  LambdaExecutionRole:
+  LambdaExecutionRole1:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonSNSReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess    
+              
+  LambdaExecutionRole2:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -96,43 +115,40 @@ Resources:
   LambdaRunGlueJob:
     Type: AWS::Lambda::Function
     Properties:
-      Handler: index.lambda_handler
+      Handler: lambda_run_glue_jobs.lambda_handler
       Description: Lambda function 
-      Role: !GetAtt LambdaExecutionRole.Arn
+      Role: !GetAtt LambdaExecutionRole2.Arn
       Runtime: python3.12
       Code:
-        ZipFile: |
-          import json
-
-          def lambda_handler(event, context):
-
-              print(event)
-              # TODO implement
-              return {
-                  'statusCode': 200,
-                  'body': json.dumps('Hello from Lambda!')
-              }
-
+        S3Bucket: !Sub 'codebucket-${AWS::AccountId}'
+        S3Key: lambda_run_glue_jobs.zip
 
   LambdaSaveS3Config:
     Type: AWS::Lambda::Function
     Properties:
-      Handler: index.lambda_handler
+      Handler: lambda_save_s3_config.lambda_handler
       Description: Lambda function 
-      Role: !GetAtt LambdaExecutionRole.Arn
+      Role: !GetAtt LambdaExecutionRole1.Arn
       Runtime: python3.12
+      Environment: 
+        Variables:
+          "TABLE_NAME": !Ref DynamoDBTable
       Code:
-        ZipFile: |
-          import json
+        S3Bucket: !Sub 'codebucket-${AWS::AccountId}'
+        S3Key: lambda_save_s3_config.zip
 
-          def lambda_handler(event, context):
-
-              print(event)
-              # TODO implement
-              return {
-                  'statusCode': 200,
-                  'body': json.dumps('Hello from Lambda!')
-              }
-
-
-
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "s3file-config-table-${AWS::AccountId}"
+      AttributeDefinitions:
+        - AttributeName: object_key
+          AttributeType: S
+        - AttributeName: version_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: object_key
+          KeyType: HASH
+        - AttributeName: version_id
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
