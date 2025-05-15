@@ -418,3 +418,40 @@ Resources:
       Code:
         S3Bucket: !Sub 'codebucket-${AWS::AccountId}'
         S3Key: lambda_glue_job_failure.zip
+
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput: 
+        Name: !Sub "glue_database_${AWS::Region}_${AWS::AccountId}"
+
+  TextFilesCrawler:
+    Type: 'AWS::Glue::Crawler'
+    Properties:
+      Name: !Sub "textfiles_crawler_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      DatabaseName: !Ref GlueDatabase
+      Targets:
+        S3Targets:
+          - Path: !Sub s3://crawlerfiles-${AWS::Region}-${AWS::AccountId}/textdata/
+
+  JSONFilesCrawler:
+    Type: 'AWS::Glue::Crawler'
+    Properties:
+      Name: !Sub "jsonfiles_crawler_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      DatabaseName: !Ref GlueDatabase
+      Targets:
+        S3Targets:
+          - Path: !Sub s3://crawlerfiles-${AWS::Region}-${AWS::AccountId}/jsondata/
+
+  CSVFilesCrawler:
+    Type: 'AWS::Glue::Crawler'
+    Properties:
+      Name: !Sub "csvfiles_crawler_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      DatabaseName: !Ref GlueDatabase
+      Targets:
+        S3Targets:
+          - Path: !Sub s3://crawlerfiles-${AWS::Region}-${AWS::AccountId}/csvdata/
