@@ -141,6 +141,8 @@ Resources:
       Environment: 
         Variables:
           "TABLE_NAME": !Ref DynamoDBTable
+          "ACCOUNT_ID": !Sub ${AWS::AccountId}
+          "REGION_NAME": !Sub ${AWS::Region}
       Code:
         S3Bucket: !Sub 'codebucket-${AWS::AccountId}'
         S3Key: lambda_run_glue_jobs.zip
@@ -174,3 +176,117 @@ Resources:
         - AttributeName: version_id
           KeyType: RANGE
       BillingMode: PAY_PER_REQUEST
+  
+  GlueJobRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess    
+
+  GlueJobText5KB:
+    Type: AWS::Glue::Job
+    Properties:
+      Command: 
+        Name: glueetl
+        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_text_5KB.py
+        PythonVersion: 3
+      Name: !Sub "glue_job_text_5kb_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      GlueVersion: 3.0
+
+  GlueJobText5KBTo10KB:
+    Type: AWS::Glue::Job
+    Properties:
+      Command: 
+        Name: glueetl
+        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_text_5_10KB.py
+        PythonVersion: 3
+      Name: !Sub "glue_job_text_5_10kb_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      GlueVersion: 3.0
+
+  GlueJobTextOther:
+    Type: AWS::Glue::Job
+    Properties:
+      Command: 
+        Name: glueetl
+        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_text_other.py
+        PythonVersion: 3
+      Name: !Sub "glue_job_text_other_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      GlueVersion: 3.0
+
+  GlueJobJSON5KB:
+    Type: AWS::Glue::Job
+    Properties:
+      Command: 
+        Name: glueetl
+        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_json_5KB.py
+        PythonVersion: 3
+      Name: !Sub "glue_job_json_5kb_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      GlueVersion: 3.0
+
+  GlueJobJSON5KBTo10KB:
+    Type: AWS::Glue::Job
+    Properties:
+      Command: 
+        Name: glueetl
+        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_json_5_10KB.py
+        PythonVersion: 3
+      Name: !Sub "glue_job_json_5_10kb_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      GlueVersion: 3.0
+
+  GlueJobJSONOther:
+    Type: AWS::Glue::Job
+    Properties:
+      Command: 
+        Name: glueetl
+        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_JSON_other.py
+        PythonVersion: 3
+      Name: !Sub "glue_job_json_other_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      GlueVersion: 3.0
+
+  GlueJobCSV5KB:
+    Type: AWS::Glue::Job
+    Properties:
+      Command: 
+        Name: glueetl
+        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_csv_5KB.py
+        PythonVersion: 3
+      Name: !Sub "glue_job_csv_5kb_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      GlueVersion: 3.0
+
+  GlueJobCSV5KBTo10KB:
+    Type: AWS::Glue::Job
+    Properties:
+      Command: 
+        Name: glueetl
+        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_csv_5_10KB.py
+        PythonVersion: 3
+      Name: !Sub "glue_job_csv_5_10kb_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      GlueVersion: 3.0
+
+  GlueJobCSVOther:
+    Type: AWS::Glue::Job
+    Properties:
+      Command: 
+        Name: glueetl
+        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_csv_other.py
+        PythonVersion: 3
+      Name: !Sub "glue_job_csv_other_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      GlueVersion: 3.0

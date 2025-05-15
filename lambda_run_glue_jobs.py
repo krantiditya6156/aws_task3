@@ -5,6 +5,8 @@ import boto3
 from boto3.dynamodb.conditions import Key
 
 TABLE_NAME = os.environ["TABLE_NAME"]
+ACCOUNT_ID = os.environ["ACCOUNT_ID"]
+REGION_NAME = os.environ["REGION_NAME"]
 
 dynamodb = boto3.resource("dynamodb")
 
@@ -31,27 +33,27 @@ def get_glue_job_name(content_type, file_size):
 
     elif content_type == "text/plain":
         if file_size <= 5000:
-            glue_job_name = "gluejob_text_5kb"
+            glue_job_name = "glue_job_text_5kb_" + REGION_NAME + "_" + ACCOUNT_ID
         elif file_size > 5000 and file_size <= 10000:
-            glue_job_name = "gluejob_text_5_10kb"
+            glue_job_name = "glue_job_text_5_10kb_" + REGION_NAME + "_" + ACCOUNT_ID
         else:
-            glue_job_name = "gluejob_text_other"
+            glue_job_name = "glue_job_text_other_" + REGION_NAME + "_" + ACCOUNT_ID
 
     elif content_type == "application/json":
         if file_size <= 5000:
-            glue_job_name = "gluejob_json_5kb"
+            glue_job_name = "glue_job_json_5kb_" + REGION_NAME + "_" + ACCOUNT_ID
         elif file_size > 5000 and file_size <= 10000:
-            glue_job_name = "gluejob_json_5_10kb"
+            glue_job_name = "glue_job_json_5_10kb_" + REGION_NAME + "_" + ACCOUNT_ID
         else:
-            glue_job_name = "gluejob_json_other"
+            glue_job_name = "glue_job_json_other_" + REGION_NAME + "_" + ACCOUNT_ID
 
     elif content_type == "text/csv":
         if file_size <= 5000:
-            glue_job_name = "gluejob_csv_5kb"
+            glue_job_name = "glue_job_csv_5kb_" + REGION_NAME + "_" + ACCOUNT_ID
         elif file_size > 5000 and file_size <= 10000:
-            glue_job_name = "gluejob_csv_5_10kb"
+            glue_job_name = "glue_job_csv_5_10kb_" + REGION_NAME + "_" + ACCOUNT_ID
         else:
-            glue_job_name = "gluejob_csv_other"
+            glue_job_name = "glue_job_csv_other_" + REGION_NAME + "_" + ACCOUNT_ID
 
     return glue_job_name
 
