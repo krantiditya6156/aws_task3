@@ -252,7 +252,7 @@ Resources:
     Properties:
       Command: 
         Name: glueetl
-        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_JSON_other.py
+        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_json_other.py
         PythonVersion: 3
       Name: !Sub "glue_job_json_other_${AWS::Region}_${AWS::AccountId}"
       Role: !Ref GlueJobRole
@@ -290,3 +290,131 @@ Resources:
       Name: !Sub "glue_job_csv_other_${AWS::Region}_${AWS::AccountId}"
       Role: !Ref GlueJobRole
       GlueVersion: 3.0
+
+  EventBridgeGlueJobSuccess:
+    Type: AWS::Events::Rule
+    Properties:
+      EventBusName: default
+      EventPattern: 
+        source: 
+          - aws.glue
+        detail-type:
+          - Glue Job State Change
+        detail:
+          state:
+            - SUCCEEDED
+          jobName:
+            - !Ref GlueJobText5KB
+            - !Ref GlueJobText5KBTo10KB
+            - !Ref GlueJobTextOther
+            - !Ref GlueJobJSON5KB
+            - !Ref GlueJobJSON5KBTo10KB
+            - !Ref GlueJobJSONOther
+            - !Ref GlueJobCSV5KB
+            - !Ref GlueJobCSV5KBTo10KB
+            - !Ref GlueJobCSVOther         
+      Targets: 
+        - Arn: !GetAtt LambdaGlueJobSuccess.Arn
+          Id: TargetFunctionV1
+
+  LambdaExecutionRole3:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      
+  InvokeLambdaGlueJobSuccess:
+    Type: AWS::Lambda::Permission
+    Properties: 
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref  LambdaGlueJobSuccess
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventBridgeGlueJobSuccess.Arn
+
+  LambdaGlueJobSuccess:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: lambda_glue_job_success.lambda_handler
+      Description: Lambda function 
+      Role: !GetAtt LambdaExecutionRole3.Arn
+      Runtime: python3.12
+      Environment: 
+        Variables:
+          "TABLE_NAME": !Ref DynamoDBTable
+          "ACCOUNT_ID": !Sub ${AWS::AccountId}
+          "REGION_NAME": !Sub ${AWS::Region}
+      Code:
+        S3Bucket: !Sub 'codebucket-${AWS::AccountId}'
+        S3Key: lambda_glue_job_success.zip
+
+  EventBridgeGlueJobFailure:
+    Type: AWS::Events::Rule
+    Properties:
+      EventBusName: default
+      EventPattern: 
+        source: 
+          - aws.glue
+        detail-type:
+          - Glue Job State Change
+        detail:
+          state:
+            - FAILED
+          jobName:
+            - !Ref GlueJobText5KB
+            - !Ref GlueJobText5KBTo10KB
+            - !Ref GlueJobTextOther
+            - !Ref GlueJobJSON5KB
+            - !Ref GlueJobJSON5KBTo10KB
+            - !Ref GlueJobJSONOther
+            - !Ref GlueJobCSV5KB
+            - !Ref GlueJobCSV5KBTo10KB
+            - !Ref GlueJobCSVOther         
+      Targets: 
+        - Arn: !GetAtt LambdaGlueJobFailure.Arn
+          Id: TargetFunctionV1
+
+  LambdaExecutionRole4:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      
+  InvokeLambdaGlueJobFailure:
+    Type: AWS::Lambda::Permission
+    Properties: 
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref  LambdaGlueJobFailure
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventBridgeGlueJobFailure.Arn
+
+  LambdaGlueJobFailure:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: lambda_glue_job_failure.lambda_handler
+      Description: Lambda function 
+      Role: !GetAtt LambdaExecutionRole4.Arn
+      Runtime: python3.12
+      Environment: 
+        Variables:
+          "TABLE_NAME": !Ref DynamoDBTable
+          "ACCOUNT_ID": !Sub ${AWS::AccountId}
+          "REGION_NAME": !Sub ${AWS::Region}
+      Code:
+        S3Bucket: !Sub 'codebucket-${AWS::AccountId}'
+        S3Key: lambda_glue_job_failure.zip
