@@ -1,10 +1,13 @@
 import json
+import os
 import time
 
 import boto3
 
-ATHENA_OUTPUT = "s3://athena-query-results-bucket005/"
-DATABASE = "glue_database"
+ATHENA_OUTPUT = os.environ["ATHENA_OUTPUT_BUCKET_URI"]
+DATABASE = os.environ["GLUE_DATABASE_NAME"]
+ACCOUNT_ID = os.environ["ACCOUNT_ID"]
+REGION_NAME = os.environ["REGION_NAME"]
 
 
 def run_crawler(crawler_name):
@@ -17,6 +20,7 @@ def run_crawler(crawler_name):
             if get_crawler_state(crawler_name) == "READY":
                 print("Crawler completed successfully.")
                 break
+            print("Crawler is running...")
             time.sleep(10)
     except Exception as e:
         print(e)
@@ -37,11 +41,11 @@ def get_crawler_state(crawler_name):
 def get_crawler_name(job_name):
     try:
         if "csv" in job_name:
-            crawler_name = "csvfiles_crawler"
+            crawler_name = "csvfiles_crawler_" + REGION_NAME + "_" + ACCOUNT_ID
         elif "json" in job_name:
-            crawler_name = "jsonfiles_crawler"
+            crawler_name = "jsonfiles_crawler_" + REGION_NAME + "_" + ACCOUNT_ID
         elif "text" in job_name:
-            crawler_name = "textfiles_crawler"
+            crawler_name = "textfiles_crawler_" + REGION_NAME + "_" + ACCOUNT_ID
         return crawler_name
     except Exception as e:
         print(e)
@@ -89,13 +93,22 @@ def lambda_handler(event, context):
 
             crawler_name = get_crawler_name(job_name)
 
-            if get_crawler_state(crawler_name) == "READY":
-                run_crawler(crawler_name)
-            else:
-                raise Exception("Crawler is not ready.")
+            max_retries = 30
+            retry_count = 0
+
+            while True:
+                if get_crawler_state(crawler_name) == "READY":
+                    run_crawler(crawler_name)
+                    break
+                else:
+                    print(
+                        f"{crawler_name} is not ready, retrying {retry_count + 1}/{max_retries}"
+                    )
+                    time.sleep(10)
+                    retry_count += 1
 
             table_name = get_table_name(crawler_name)
-            query = f"SELECT * FROM {table_name} LIMIT 10;"
+            query = f"SELECT * FROM {table_name} ;"
             print(f"Query: {query}")
 
             response = run_athena_query(query, DATABASE)

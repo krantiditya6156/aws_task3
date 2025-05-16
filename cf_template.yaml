@@ -4,6 +4,10 @@ Parameters:
     Description: Enter source bucket name
     Type: String
 
+  AthenaOutputBucketName:
+    Description: Enter athena output bucket name
+    Type: String
+
 Resources:
   SourceBucket:
     Type: AWS::S3::Bucket 
@@ -330,6 +334,77 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns: 
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CrawlerPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - glue:StartCrawler
+                  - glue:GetCrawler
+                  - glue:GetTables
+                  - glue:GetTable     
+                Resource: !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:crawler/*
+
+        - PolicyName: GlueDatbasePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - glue:GetDatabase
+                  - glue:GetCatalogs
+                  - glue:GetTables
+                  - glue:GetCatalog
+                  - glue:GetDatabases
+                  - glue:GetTable
+                Resource: 
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabase}
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabase}/*
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog/*
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${GlueDatabase}
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${GlueDatabase}/*
+
+        - PolicyName: AthenaPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - athena:StartQueryExecution    
+                Resource: !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/*
+
+        - PolicyName: ReadFromS3
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetObject
+                Resource: 
+                  - !Sub arn:aws:s3:::crawlerfiles-${AWS::Region}-${AWS::AccountId}
+                  - !Sub arn:aws:s3:::crawlerfiles-${AWS::Region}-${AWS::AccountId}/*
+
+        - PolicyName: S3AccessPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:CreateBucket
+                  - s3:ListBucket
+                Resource: 
+                  - !Sub arn:aws:s3:::${AthenaOutputBucket}/*
+                  - !Sub arn:aws:s3:::${AthenaOutputBucket}
+            
+              - Effect: Allow
+                Action: s3:GetBucketLocation
+                Resource: arn:aws:s3:::*
       
   InvokeLambdaGlueJobSuccess:
     Type: AWS::Lambda::Permission
@@ -346,9 +421,11 @@ Resources:
       Description: Lambda function 
       Role: !GetAtt LambdaExecutionRole3.Arn
       Runtime: python3.12
+      Timeout: 900
       Environment: 
         Variables:
-          "TABLE_NAME": !Ref DynamoDBTable
+          "GLUE_DATABASE_NAME": !Ref GlueDatabase
+          "ATHENA_OUTPUT_BUCKET_URI": !Sub "s3://${AthenaOutputBucket}/"
           "ACCOUNT_ID": !Sub ${AWS::AccountId}
           "REGION_NAME": !Sub ${AWS::Region}
       Code:
@@ -455,3 +532,9 @@ Resources:
       Targets:
         S3Targets:
           - Path: !Sub s3://crawlerfiles-${AWS::Region}-${AWS::AccountId}/csvdata/
+
+  AthenaOutputBucket:
+    Type: AWS::S3::Bucket 
+    Properties:
+      BucketName: !Sub "${AthenaOutputBucketName}-${AWS::Region}-${AWS::AccountId}"
+      
