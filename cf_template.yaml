@@ -8,6 +8,10 @@ Parameters:
     Description: Enter athena output bucket name
     Type: String
 
+  EmailAddress:
+    Description: Enter email address for SNS topic
+    Type: String
+
 Resources:
   SourceBucket:
     Type: AWS::S3::Bucket 
@@ -471,6 +475,15 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns: 
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: SNSPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:Publish   
+                Resource: !Ref SNSTopicOutput
       
   InvokeLambdaGlueJobFailure:
     Type: AWS::Lambda::Permission
@@ -489,9 +502,7 @@ Resources:
       Runtime: python3.12
       Environment: 
         Variables:
-          "TABLE_NAME": !Ref DynamoDBTable
-          "ACCOUNT_ID": !Sub ${AWS::AccountId}
-          "REGION_NAME": !Sub ${AWS::Region}
+          "TOPIC_ARN": !Ref SNSTopicOutput          
       Code:
         S3Bucket: !Sub 'codebucket-${AWS::AccountId}'
         S3Key: lambda_glue_job_failure.zip
@@ -538,3 +549,10 @@ Resources:
     Properties:
       BucketName: !Sub "${AthenaOutputBucketName}-${AWS::Region}-${AWS::AccountId}"
       
+  SNSTopicOutput:
+    Type: AWS::SNS::Topic
+    Properties:    
+      Subscription: 
+        - Endpoint: !Ref EmailAddress         
+          Protocol: email
+      TopicName: SNSTopicForGlueJobFailure
