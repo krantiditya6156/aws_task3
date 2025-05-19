@@ -12,7 +12,7 @@ class DataFiles:
         self.no_of_csvfiles = no_of_csvfiles
         self.no_of_jsonfiles = no_of_jsonfiles
         self.no_of_txtfiles = no_of_txtfiles
-        self.headers = ["Name", "Age", "City"]
+        self.headers = ["Name", "Age", "Country"]
 
     def create_csv_files(self):
         dir = "csvdata/"
@@ -53,7 +53,7 @@ class DataFiles:
             with open(join(dir, filename), "w") as file:
                 file.write(", ".join(self.headers) + "\n")
                 for row in data:
-                    file.write(f"{row['Name']}, {row['Age']}, {row['City']}\n")
+                    file.write(f"{row['Name']}, {row['Age']}, {row['Country']}\n")
             file.close()
 
     def generate_random_string(self, length):
@@ -65,7 +65,7 @@ class DataFiles:
             entry = {
                 "Name": self.generate_random_string(random.randint(5, 10)),
                 "Age": random.randint(20, 60),
-                "City": self.generate_random_string(random.randint(5, 10)),
+                "Country": random.choice(COUNTRIES),
             }
             data.append(entry)
         return data
@@ -73,6 +73,15 @@ class DataFiles:
     def upload_to_s3bucket(self):
         pass
 
+
+COUNTRIES = ["Abkhazia", "Afghanistan", "Albania", "Algeria", "American Samoa", "Andorra", 
+             "Angola", "Anguilla", "Antigua and Barbuda", "Argentina", "Armenia", "Aruba", 
+             "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", 
+             "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bermuda", "Bhutan", 
+             "Bolivia", "Bonaire", "Bosnia and Herzegovina", "Botswana", "Bouvet Island", 
+             "Brazil", "British Indian Ocean Territory", "British Virgin Islands", 
+             "Virgin Islands, British", "Brunei", "Brunei Darussalam", "Bulgaria", 
+             "Burkina Faso", "Burundi", "Cambodia", "Cameroon", "Canada"]
 
 obj = DataFiles(5, 5, 5)
 

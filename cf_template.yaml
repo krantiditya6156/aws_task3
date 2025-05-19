@@ -155,6 +155,9 @@ Resources:
           "TABLE_NAME": !Ref DynamoDBTable
           "ACCOUNT_ID": !Sub ${AWS::AccountId}
           "REGION_NAME": !Sub ${AWS::Region}
+          "SOURCE_BUCKET_NAME": !Ref SourceBucketName
+          "CRAWLER_BUCKET_NAME": !Sub crawlerfiles-${AWS::Region}-${AWS::AccountId}
+
       Code:
         S3Bucket: !Ref CodeBucketName
         S3Key: lambda_run_glue_jobs.zip

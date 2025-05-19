@@ -7,6 +7,9 @@ from boto3.dynamodb.conditions import Key
 TABLE_NAME = os.environ["TABLE_NAME"]
 ACCOUNT_ID = os.environ["ACCOUNT_ID"]
 REGION_NAME = os.environ["REGION_NAME"]
+SOURCE_BUCKET_NAME = os.environ["SOURCE_BUCKET_NAME"]
+CRAWLER_BUCKET_NAME = os.environ["CRAWLER_BUCKET_NAME"]
+
 
 dynamodb = boto3.resource("dynamodb")
 
@@ -89,7 +92,14 @@ def lambda_handler(event, context):
         print(f"glue_job_name: {glue_job_name}")
 
         glue_client = boto3.client("glue")
-        glue_client.start_job_run(JobName=glue_job_name)
+        glue_client.start_job_run(
+            JobName=glue_job_name,
+            Arguments={
+                "--SOURCE_BUCKET_NAME": SOURCE_BUCKET_NAME,
+                "--CRAWLER_BUCKET_NAME": CRAWLER_BUCKET_NAME,
+                "--FILE_NAME": file_name,
+            },
+        )
         print(f"Glue job {glue_job_name} started")
 
     except Exception as e:
