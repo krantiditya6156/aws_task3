@@ -12,7 +12,7 @@ REGION_NAME = os.environ["REGION_NAME"]
 
 def run_crawler(crawler_name):
     try:
-        client = boto3.client("glue")
+        client = boto3.client("glue", region_name=REGION_NAME)
         client.start_crawler(Name=crawler_name)
         print(f"{crawler_name} started")
 
@@ -29,7 +29,7 @@ def run_crawler(crawler_name):
 
 def get_crawler_state(crawler_name):
     try:
-        client = boto3.client("glue")
+        client = boto3.client("glue", region_name=REGION_NAME)
         response = client.get_crawler(Name=crawler_name)
         crawler_state = response["Crawler"]["State"]
         return crawler_state
@@ -54,7 +54,7 @@ def get_crawler_name(job_name):
 
 def get_table_name(crawler_name):
     try:
-        client = boto3.client("glue")
+        client = boto3.client("glue", region_name=REGION_NAME)
         response = client.get_crawler(Name=crawler_name)
         print(response)
         table_name = response["Crawler"]["Targets"]["S3Targets"][0]["Path"].split("/")[
@@ -68,7 +68,7 @@ def get_table_name(crawler_name):
 
 def run_athena_query(query, database):
     try:
-        client = boto3.client("athena", region_name="ap-south-1")
+        client = boto3.client("athena", region_name=REGION_NAME)
         response = client.start_query_execution(
             QueryString=query,
             QueryExecutionContext={"Database": database},

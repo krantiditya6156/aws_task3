@@ -4,6 +4,10 @@ Parameters:
     Description: Enter source bucket name
     Type: String
 
+  CodeBucketName:
+    Description: Enter code bucket name
+    Type: String
+
   AthenaOutputBucketName:
     Description: Enter athena output bucket name
     Type: String
@@ -152,7 +156,7 @@ Resources:
           "ACCOUNT_ID": !Sub ${AWS::AccountId}
           "REGION_NAME": !Sub ${AWS::Region}
       Code:
-        S3Bucket: !Sub 'codebucket-${AWS::AccountId}'
+        S3Bucket: !Ref CodeBucketName
         S3Key: lambda_run_glue_jobs.zip
 
   LambdaSaveS3Config:
@@ -166,7 +170,7 @@ Resources:
         Variables:
           "TABLE_NAME": !Ref DynamoDBTable
       Code:
-        S3Bucket: !Sub 'codebucket-${AWS::AccountId}'
+        S3Bucket: !Ref CodeBucketName
         S3Key: lambda_save_s3_config.zip
 
   DynamoDBTable:
@@ -205,7 +209,7 @@ Resources:
     Properties:
       Command: 
         Name: glueetl
-        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_text_5KB.py
+        ScriptLocation: !Sub "s3://${CodeBucketName}/glue_scripts/glue_text_5KB.py"
         PythonVersion: 3
       Name: !Sub "glue_job_text_5kb_${AWS::Region}_${AWS::AccountId}"
       Role: !Ref GlueJobRole
@@ -216,7 +220,7 @@ Resources:
     Properties:
       Command: 
         Name: glueetl
-        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_text_5_10KB.py
+        ScriptLocation: !Sub s3://${CodeBucketName}/glue_scripts/glue_text_5_10KB.py
         PythonVersion: 3
       Name: !Sub "glue_job_text_5_10kb_${AWS::Region}_${AWS::AccountId}"
       Role: !Ref GlueJobRole
@@ -227,7 +231,7 @@ Resources:
     Properties:
       Command: 
         Name: glueetl
-        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_text_other.py
+        ScriptLocation: !Sub s3://${CodeBucketName}/glue_scripts/glue_text_other.py
         PythonVersion: 3
       Name: !Sub "glue_job_text_other_${AWS::Region}_${AWS::AccountId}"
       Role: !Ref GlueJobRole
@@ -238,7 +242,7 @@ Resources:
     Properties:
       Command: 
         Name: glueetl
-        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_json_5KB.py
+        ScriptLocation: !Sub s3://${CodeBucketName}/glue_scripts/glue_json_5KB.py
         PythonVersion: 3
       Name: !Sub "glue_job_json_5kb_${AWS::Region}_${AWS::AccountId}"
       Role: !Ref GlueJobRole
@@ -249,7 +253,7 @@ Resources:
     Properties:
       Command: 
         Name: glueetl
-        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_json_5_10KB.py
+        ScriptLocation: !Sub s3://${CodeBucketName}/glue_scripts/glue_json_5_10KB.py
         PythonVersion: 3
       Name: !Sub "glue_job_json_5_10kb_${AWS::Region}_${AWS::AccountId}"
       Role: !Ref GlueJobRole
@@ -260,7 +264,7 @@ Resources:
     Properties:
       Command: 
         Name: glueetl
-        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_json_other.py
+        ScriptLocation: !Sub s3://${CodeBucketName}/glue_scripts/glue_json_other.py
         PythonVersion: 3
       Name: !Sub "glue_job_json_other_${AWS::Region}_${AWS::AccountId}"
       Role: !Ref GlueJobRole
@@ -271,7 +275,7 @@ Resources:
     Properties:
       Command: 
         Name: glueetl
-        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_csv_5KB.py
+        ScriptLocation: !Sub s3://${CodeBucketName}/glue_scripts/glue_csv_5KB.py
         PythonVersion: 3
       Name: !Sub "glue_job_csv_5kb_${AWS::Region}_${AWS::AccountId}"
       Role: !Ref GlueJobRole
@@ -282,7 +286,7 @@ Resources:
     Properties:
       Command: 
         Name: glueetl
-        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_csv_5_10KB.py
+        ScriptLocation: !Sub s3://${CodeBucketName}/glue_scripts/glue_csv_5_10KB.py
         PythonVersion: 3
       Name: !Sub "glue_job_csv_5_10kb_${AWS::Region}_${AWS::AccountId}"
       Role: !Ref GlueJobRole
@@ -293,7 +297,7 @@ Resources:
     Properties:
       Command: 
         Name: glueetl
-        ScriptLocation: !Sub s3://codebucket-${AWS::AccountId}/glue_scripts/glue_csv_other.py
+        ScriptLocation: !Sub s3://${CodeBucketName}/glue_scripts/glue_csv_other.py
         PythonVersion: 3
       Name: !Sub "glue_job_csv_other_${AWS::Region}_${AWS::AccountId}"
       Role: !Ref GlueJobRole
@@ -433,7 +437,7 @@ Resources:
           "ACCOUNT_ID": !Sub ${AWS::AccountId}
           "REGION_NAME": !Sub ${AWS::Region}
       Code:
-        S3Bucket: !Sub 'codebucket-${AWS::AccountId}'
+        S3Bucket: !Ref CodeBucketName
         S3Key: lambda_glue_job_success.zip
 
   EventBridgeGlueJobFailure:
@@ -504,7 +508,7 @@ Resources:
         Variables:
           "TOPIC_ARN": !Ref SNSTopicOutput          
       Code:
-        S3Bucket: !Sub 'codebucket-${AWS::AccountId}'
+        S3Bucket: !Ref CodeBucketName
         S3Key: lambda_glue_job_failure.zip
 
   GlueDatabase:
