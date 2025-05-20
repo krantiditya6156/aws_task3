@@ -1,0 +1,565 @@
+---
+Parameters:
+  SourceBucketName:
+    Description: Enter source bucket name
+    Type: String
+
+  CodeBucketName:
+    Description: Enter code bucket name
+    Type: String
+
+  AthenaOutputBucketName:
+    Description: Enter athena output bucket name
+    Type: String
+
+  EmailAddress:
+    Description: Enter email address for SNS topic
+    Type: String
+
+Resources:
+  SourceBucket:
+    Type: AWS::S3::Bucket 
+    Properties:
+      BucketName: !Ref SourceBucketName
+      NotificationConfiguration:
+        TopicConfigurations:
+          - Event: "s3:ObjectCreated:*"
+            Topic: !Ref SNSTopic
+      VersioningConfiguration:
+        Status: Enabled
+
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:    
+      Subscription: 
+        - Endpoint: !GetAtt LambdaRunGlueJob.Arn           
+          Protocol: lambda
+        - Endpoint: !GetAtt LambdaSaveS3Config.Arn            
+          Protocol: lambda
+      TopicName: SNSTopicForFilesBucket
+
+  SNSTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Sid: SNSActions
+            Effect: Allow
+            Principal:
+                AWS: "*"
+            Action:
+              - SNS:Publish
+              - SNS:RemovePermission
+              - SNS:SetTopicAttributes
+              - SNS:DeleteTopic
+              - SNS:ListSubscriptionsByTopic
+              - SNS:GetTopicAttributes
+              - SNS:AddPermission
+              - SNS:Subscribe
+            Resource: !Ref SNSTopic
+            Condition:
+                StringEquals:
+                  AWS:SourceOwner: !Sub '${AWS::AccountId}'
+
+          - Sid: S3Acsess
+            Effect: Allow
+            Principal: 
+              Service: 
+                - s3.amazonaws.com
+            Action: SNS:Publish
+            Resource: !Ref SNSTopic
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Sub '${AWS::AccountId}'
+              ArnEquals:
+                aws:SourceArn: !Sub arn:aws:s3:::${SourceBucketName}
+      Topics:
+        - !Ref SNSTopic
+
+  LambdaExecutionRole1:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonSNSReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess    
+              
+  LambdaExecutionRole2:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonSNSReadOnlyAccess
+      Policies:
+        - PolicyName: DynamoDBGet
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query                 
+                Resource: !GetAtt DynamoDBTable.Arn
+
+        - PolicyName: GlueStartJobRun
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - glue:StartJobRun
+                  - glue:GetJobRun                                    
+                Resource: !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/*
+
+  InvokeLambdaRunGlueJob:
+    Type: AWS::Lambda::Permission
+    Properties: 
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref  LambdaRunGlueJob
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref SNSTopic
+
+  InvokeLambdaSaveS3Config:
+    Type: AWS::Lambda::Permission
+    Properties: 
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref  LambdaSaveS3Config
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref SNSTopic      
+
+  LambdaRunGlueJob:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: lambda_run_glue_jobs.lambda_handler
+      Description: Lambda function 
+      Role: !GetAtt LambdaExecutionRole2.Arn
+      Runtime: python3.12
+      Environment: 
+        Variables:
+          "TABLE_NAME": !Ref DynamoDBTable
+          "ACCOUNT_ID": !Sub ${AWS::AccountId}
+          "REGION_NAME": !Sub ${AWS::Region}
+          "SOURCE_BUCKET_NAME": !Ref SourceBucketName
+          "CRAWLER_BUCKET_NAME": !Sub crawlerfiles-${AWS::Region}-${AWS::AccountId}
+
+      Code:
+        S3Bucket: !Ref CodeBucketName
+        S3Key: lambda_run_glue_jobs.zip
+
+  LambdaSaveS3Config:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: lambda_save_s3_config.lambda_handler
+      Description: Lambda function 
+      Role: !GetAtt LambdaExecutionRole1.Arn
+      Runtime: python3.12
+      Environment: 
+        Variables:
+          "TABLE_NAME": !Ref DynamoDBTable
+      Code:
+        S3Bucket: !Ref CodeBucketName
+        S3Key: lambda_save_s3_config.zip
+
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "s3file-config-table-${AWS::AccountId}"
+      AttributeDefinitions:
+        - AttributeName: object_key
+          AttributeType: S
+        - AttributeName: version_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: object_key
+          KeyType: HASH
+        - AttributeName: version_id
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+  
+  GlueJobRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess    
+
+  GlueJobText5KB:
+    Type: AWS::Glue::Job
+    Properties:
+      Command: 
+        Name: glueetl
+        ScriptLocation: !Sub "s3://${CodeBucketName}/glue_scripts/glue_text_5KB.py"
+        PythonVersion: 3
+      Name: !Sub "glue_job_text_5kb_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      GlueVersion: 3.0
+
+  GlueJobText5KBTo10KB:
+    Type: AWS::Glue::Job
+    Properties:
+      Command: 
+        Name: glueetl
+        ScriptLocation: !Sub s3://${CodeBucketName}/glue_scripts/glue_text_5_10KB.py
+        PythonVersion: 3
+      Name: !Sub "glue_job_text_5_10kb_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      GlueVersion: 3.0
+
+  GlueJobTextOther:
+    Type: AWS::Glue::Job
+    Properties:
+      Command: 
+        Name: glueetl
+        ScriptLocation: !Sub s3://${CodeBucketName}/glue_scripts/glue_text_other.py
+        PythonVersion: 3
+      Name: !Sub "glue_job_text_other_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      GlueVersion: 3.0
+
+  GlueJobJSON5KB:
+    Type: AWS::Glue::Job
+    Properties:
+      Command: 
+        Name: glueetl
+        ScriptLocation: !Sub s3://${CodeBucketName}/glue_scripts/glue_json_5KB.py
+        PythonVersion: 3
+      Name: !Sub "glue_job_json_5kb_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      GlueVersion: 3.0
+
+  GlueJobJSON5KBTo10KB:
+    Type: AWS::Glue::Job
+    Properties:
+      Command: 
+        Name: glueetl
+        ScriptLocation: !Sub s3://${CodeBucketName}/glue_scripts/glue_json_5_10KB.py
+        PythonVersion: 3
+      Name: !Sub "glue_job_json_5_10kb_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      GlueVersion: 3.0
+
+  GlueJobJSONOther:
+    Type: AWS::Glue::Job
+    Properties:
+      Command: 
+        Name: glueetl
+        ScriptLocation: !Sub s3://${CodeBucketName}/glue_scripts/glue_json_other.py
+        PythonVersion: 3
+      Name: !Sub "glue_job_json_other_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      GlueVersion: 3.0
+
+  GlueJobCSV5KB:
+    Type: AWS::Glue::Job
+    Properties:
+      Command: 
+        Name: glueetl
+        ScriptLocation: !Sub s3://${CodeBucketName}/glue_scripts/glue_csv_5KB.py
+        PythonVersion: 3
+      Name: !Sub "glue_job_csv_5kb_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      GlueVersion: 3.0
+
+  GlueJobCSV5KBTo10KB:
+    Type: AWS::Glue::Job
+    Properties:
+      Command: 
+        Name: glueetl
+        ScriptLocation: !Sub s3://${CodeBucketName}/glue_scripts/glue_csv_5_10KB.py
+        PythonVersion: 3
+      Name: !Sub "glue_job_csv_5_10kb_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      GlueVersion: 3.0
+
+  GlueJobCSVOther:
+    Type: AWS::Glue::Job
+    Properties:
+      Command: 
+        Name: glueetl
+        ScriptLocation: !Sub s3://${CodeBucketName}/glue_scripts/glue_csv_other.py
+        PythonVersion: 3
+      Name: !Sub "glue_job_csv_other_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      GlueVersion: 3.0
+
+  EventBridgeGlueJobSuccess:
+    Type: AWS::Events::Rule
+    Properties:
+      EventBusName: default
+      EventPattern: 
+        source: 
+          - aws.glue
+        detail-type:
+          - Glue Job State Change
+        detail:
+          state:
+            - SUCCEEDED
+          jobName:
+            - !Ref GlueJobText5KB
+            - !Ref GlueJobText5KBTo10KB
+            - !Ref GlueJobTextOther
+            - !Ref GlueJobJSON5KB
+            - !Ref GlueJobJSON5KBTo10KB
+            - !Ref GlueJobJSONOther
+            - !Ref GlueJobCSV5KB
+            - !Ref GlueJobCSV5KBTo10KB
+            - !Ref GlueJobCSVOther         
+      Targets: 
+        - Arn: !GetAtt LambdaGlueJobSuccess.Arn
+          Id: TargetFunctionV1
+
+  LambdaExecutionRole3:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CrawlerPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - glue:StartCrawler
+                  - glue:GetCrawler
+                  - glue:GetTables
+                  - glue:GetTable     
+                Resource: !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:crawler/*
+
+        - PolicyName: GlueDatbasePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - glue:GetDatabase
+                  - glue:GetCatalogs
+                  - glue:GetTables
+                  - glue:GetCatalog
+                  - glue:GetDatabases
+                  - glue:GetTable
+                Resource: 
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabase}
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabase}/*
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog/*
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${GlueDatabase}
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${GlueDatabase}/*
+
+        - PolicyName: AthenaPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - athena:StartQueryExecution    
+                Resource: !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/*
+
+        - PolicyName: ReadFromS3
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetObject
+                Resource: 
+                  - !Sub arn:aws:s3:::crawlerfiles-${AWS::Region}-${AWS::AccountId}
+                  - !Sub arn:aws:s3:::crawlerfiles-${AWS::Region}-${AWS::AccountId}/*
+
+        - PolicyName: S3AccessPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:CreateBucket
+                  - s3:ListBucket
+                Resource: 
+                  - !Sub arn:aws:s3:::${AthenaOutputBucket}/*
+                  - !Sub arn:aws:s3:::${AthenaOutputBucket}
+            
+              - Effect: Allow
+                Action: s3:GetBucketLocation
+                Resource: arn:aws:s3:::*
+      
+  InvokeLambdaGlueJobSuccess:
+    Type: AWS::Lambda::Permission
+    Properties: 
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref  LambdaGlueJobSuccess
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventBridgeGlueJobSuccess.Arn
+
+  LambdaGlueJobSuccess:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: lambda_glue_job_success.lambda_handler
+      Description: Lambda function 
+      Role: !GetAtt LambdaExecutionRole3.Arn
+      Runtime: python3.12
+      Timeout: 900
+      Environment: 
+        Variables:
+          "GLUE_DATABASE_NAME": !Ref GlueDatabase
+          "ATHENA_OUTPUT_BUCKET_URI": !Sub "s3://${AthenaOutputBucket}/"
+          "ACCOUNT_ID": !Sub ${AWS::AccountId}
+          "REGION_NAME": !Sub ${AWS::Region}
+      Code:
+        S3Bucket: !Ref CodeBucketName
+        S3Key: lambda_glue_job_success.zip
+
+  EventBridgeGlueJobFailure:
+    Type: AWS::Events::Rule
+    Properties:
+      EventBusName: default
+      EventPattern: 
+        source: 
+          - aws.glue
+        detail-type:
+          - Glue Job State Change
+        detail:
+          state:
+            - FAILED
+          jobName:
+            - !Ref GlueJobText5KB
+            - !Ref GlueJobText5KBTo10KB
+            - !Ref GlueJobTextOther
+            - !Ref GlueJobJSON5KB
+            - !Ref GlueJobJSON5KBTo10KB
+            - !Ref GlueJobJSONOther
+            - !Ref GlueJobCSV5KB
+            - !Ref GlueJobCSV5KBTo10KB
+            - !Ref GlueJobCSVOther         
+      Targets: 
+        - Arn: !GetAtt LambdaGlueJobFailure.Arn
+          Id: TargetFunctionV1
+
+  LambdaExecutionRole4:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: SNSPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:Publish   
+                Resource: !Ref SNSTopicOutput
+      
+  InvokeLambdaGlueJobFailure:
+    Type: AWS::Lambda::Permission
+    Properties: 
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref  LambdaGlueJobFailure
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventBridgeGlueJobFailure.Arn
+
+  LambdaGlueJobFailure:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: lambda_glue_job_failure.lambda_handler
+      Description: Lambda function 
+      Role: !GetAtt LambdaExecutionRole4.Arn
+      Runtime: python3.12
+      Environment: 
+        Variables:
+          "TOPIC_ARN": !Ref SNSTopicOutput          
+      Code:
+        S3Bucket: !Ref CodeBucketName
+        S3Key: lambda_glue_job_failure.zip
+
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput: 
+        Name: !Sub "glue_database_${AWS::Region}_${AWS::AccountId}"
+
+  TextFilesCrawler:
+    Type: 'AWS::Glue::Crawler'
+    Properties:
+      Name: !Sub "textfiles_crawler_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      DatabaseName: !Ref GlueDatabase
+      Targets:
+        S3Targets:
+          - Path: !Sub s3://crawlerfiles-${AWS::Region}-${AWS::AccountId}/textdata/
+
+  JSONFilesCrawler:
+    Type: 'AWS::Glue::Crawler'
+    Properties:
+      Name: !Sub "jsonfiles_crawler_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      DatabaseName: !Ref GlueDatabase
+      Targets:
+        S3Targets:
+          - Path: !Sub s3://crawlerfiles-${AWS::Region}-${AWS::AccountId}/jsondata/
+
+  CSVFilesCrawler:
+    Type: 'AWS::Glue::Crawler'
+    Properties:
+      Name: !Sub "csvfiles_crawler_${AWS::Region}_${AWS::AccountId}"
+      Role: !Ref GlueJobRole
+      DatabaseName: !Ref GlueDatabase
+      Targets:
+        S3Targets:
+          - Path: !Sub s3://crawlerfiles-${AWS::Region}-${AWS::AccountId}/csvdata/
+
+  AthenaOutputBucket:
+    Type: AWS::S3::Bucket 
+    Properties:
+      BucketName: !Sub "${AthenaOutputBucketName}-${AWS::Region}-${AWS::AccountId}"
+      
+  SNSTopicOutput:
+    Type: AWS::SNS::Topic
+    Properties:    
+      Subscription: 
+        - Endpoint: !Ref EmailAddress         
+          Protocol: email
+      TopicName: SNSTopicForGlueJobFailure
